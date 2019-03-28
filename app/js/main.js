@@ -2,60 +2,138 @@ import * as THREE from 'three';
 // import orbit from 'three-orbit-controls';
 // const OrbitControls = orbit(THREE);
 import TrackballControls from 'three-trackballcontrols';
+import Player from './player';
+import Spawner from './spawner';
+
+let timeBefore = Date.now();
+
+class TestObject {
+	constructor({position=[0,0,0], rotation}) {
+		let geometry = new THREE.BoxGeometry(20, 20, 20);
+		let material = new THREE.MeshPhongMaterial({color: 0xF7E82ED});
+		this.mesh = new THREE.Mesh(geometry, material);
+		this.mesh.position.set(position[0], position[1], position[2]);
+	}
+}
 
 export default class App {
-  constructor() {
-    const c = document.getElementById('mycanvas');
-    // Enable antialias for smoother lines
-    this.renderer = new THREE.WebGLRenderer({canvas: c, antialias: true});
-    this.scene = new THREE.Scene();
-    // Use perspective camera:
-    //   Field of view: 75 degrees
-    //   Screen aspect ration 4:3
-    //   Near plane at z=0.5, far plane at z=500
-    this.camera = new THREE.PerspectiveCamera(75, 4/3, 0.5, 1000);
-    // Place the camera at (0,0,100)
-    this.camera.position.z = 100;
+	constructor() {
+		const canvas = document.getElementById('mycanvas');
+		// Enable antialias for smoother lines
+		this.renderer = new THREE.WebGLRenderer({canvas, antialias: true});
+		this.renderer.shadowMap.enabled = true;
+		this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // const orbiter = new OrbitControls(this.camera);
-    // orbiter.enableZoom = false;
-    // orbiter.update();
-    this.tracker = new TrackballControls(this.camera);
-    this.tracker.rotateSpeed = 2.0;
-    // Allow zoom and pan
-    this.tracker.noZoom = false;
-    this.tracker.noPan = false;
+		this.scene = new THREE.Scene();
+		this.scene.fog = new THREE.Fog( 0x000000, 750, 1200 );
 
-    // Dodecahedron radius = 30
-    const dodecgeom = new THREE.DodecahedronGeometry(30);
-    const dodecmatr = new THREE.MeshBasicMaterial({color: 0x14ae6e});
-    const dodecmesh = new THREE.Mesh(dodecgeom, dodecmatr);
-    this.scene.add(dodecmesh);
+		this.camera = new THREE.PerspectiveCamera(75, 4/3, 0.5, 5000);
 
-    window.addEventListener('resize', () => this.resizeHandler());
-    this.resizeHandler();
-    requestAnimationFrame(() => this.render());
-  }
+		this.camera.position.y = 200;
+		this.camera.position.z = 120;
+		this.camera.rotateX(-Math.PI/6);
 
-  render() {
-    this.renderer.render(this.scene, this.camera);
-    this.tracker.update();
-    // setup the render function to "autoloop"
-    requestAnimationFrame(() => this.render());
-  }
+		this.player = new Player({});
+		this.scene.add(this.player.mesh);
 
-  resizeHandler() {
-    const canvas = document.getElementById("mycanvas");
-    let w = window.innerWidth - 16;
-    let h = 0.75 * w;  /* maintain 4:3 ratio */
-    if (canvas.offsetTop + h > window.innerHeight) {
-      h = window.innerHeight - canvas.offsetTop - 16;
-      w = 4/3 * h;
-    }
-    canvas.width = w;
-    canvas.height = h;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w, h);
-    this.tracker.handleResize();
-  }
+		this.light = this.createLight();
+		this.scene.add(this.light);
+		this.scene.add(this.light.target);
+
+		// ground
+		let imageCanvas = document.createElement( "canvas" );
+		let context = imageCanvas.getContext( "2d" );
+
+		imageCanvas.width = imageCanvas.height = 128;
+
+		context.fillStyle = "#444";
+		context.fillRect( 0, 0, 128, 128 );
+
+		context.fillStyle = "#fff";
+		context.fillRect( 0, 0, 64, 64 );
+		context.fillRect( 64, 64, 64, 64 );
+
+		let textureCanvas = new THREE.CanvasTexture( imageCanvas );
+		textureCanvas.repeat.set( 1000, 1000 );
+		textureCanvas.wrapS = THREE.RepeatWrapping;
+		textureCanvas.wrapT = THREE.RepeatWrapping;
+
+		
+		let	materialCanvas = new THREE.MeshPhongMaterial( { map: textureCanvas } );
+		let geometry = new THREE.PlaneBufferGeometry( 100, 100 );
+		let meshCanvas = new THREE.Mesh( geometry, materialCanvas );
+		meshCanvas.receiveShadow = true;
+		meshCanvas.rotation.x = - Math.PI / 2;
+		meshCanvas.scale.set( 1000, 1000, 1000 );
+		this.scene.add(meshCanvas);
+
+		// ambient light
+		this.scene.add(new THREE.AmbientLight( 0x404040 )); // soft white light
+
+		let helper = new THREE.CameraHelper( this.light.shadow.camera );
+		this.scene.add( helper );
+
+		this.spawner = new Spawner({player:this.player, scene:this.scene, objects:[TestObject], intervalFunction:()=>{return 1.0}});
+		this.spawner.start();
+
+		//this.controls = new TrackballControls(this.camera);
+
+		window.addEventListener('resize', () => this.resizeHandler());
+		document.addEventListener('keydown', (e) => this.handleInput(e));
+		this.resizeHandler();
+		requestAnimationFrame(() => this.render());
+	}
+
+	createLight() {
+		let light = new THREE.DirectionalLight (0xFFFFFF, 1.0);
+		light.position.set (150, 100, 0);
+		light.shadow.camera = new THREE.OrthographicCamera( -200, 600, 200, -100, 0.5, 1000 );
+		light.shadow.mapSize.width = 2048;
+		light.shadow.mapSize.height = 2048;
+		light.castShadow = true;
+		return light;
+	}
+
+	render() {
+		let dt = (Date.now() - timeBefore) / 1000; // dt in seconds
+		timeBefore = Date.now();
+		this.player.update(dt);
+		this.spawner.update(dt);
+		this.camera.position.z = this.player.mesh.position.z + 200;
+		this.light.position.z = this.player.mesh.position.z - 100;
+		this.light.target.position.z = this.light.position.z + 10;
+
+		this.renderer.render(this.scene, this.camera);
+		//this.controls.update();
+		// setup the render function to "autoloop"
+		requestAnimationFrame(() => this.render());
+	}
+
+	resizeHandler() {
+		const canvas = document.getElementById("mycanvas");
+		let w = window.innerWidth - 16;
+		let h = 0.75 * w;  /* maintain 4:3 ratio */
+		if (canvas.offsetTop + h > window.innerHeight) {
+			h = window.innerHeight - canvas.offsetTop - 16;
+			w = 4/3 * h;
+		}
+		canvas.width = w;
+		canvas.height = h;
+		this.camera.updateProjectionMatrix();
+		this.renderer.setSize(w, h);
+		//this.tracker.handleResize();
+	}
+
+	handleInput(e) {
+		switch (e.key) {
+			case "d":
+			{
+				this.player.changeLane(1); // right
+			} break;
+			case "a":
+			{
+				this.player.changeLane(-1); // left
+			} break;
+		}
+	}
 }
