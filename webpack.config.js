@@ -47,6 +47,14 @@ module.exports = {
       //   include: SHADER_PATH,
       //   loader: 'webpack-glsl-loader'
       // }
+      {
+        test: /\.(gltf)$/,
+        loader: 'gltf-loader-2'
+      },
+      {
+        test: /\.(bin|png|jpeg)$/,
+        loader: 'file-loader'
+      }
     ]
   },
   //devtool: 'source-map'
