@@ -1,52 +1,81 @@
 import * as THREE from 'three';
-import GLTFLoader from 'three-gltf-loader';
-import carGLTF from './scene.gltf';
-
-import Player from './player';
-import Spawner from './spawner';
+import Car from './Car';
+import Box from './Box';
+import Deer from './Deer';
+import Moto from './Moto';
+import Tire from './Tire';
 
 // Variables to use throughout main
-let car;
 let countTime = 1;
 let dt;
-let position;
 let timeBefore = Date.now();
 
-class TestObject {
-    constructor({position = [0, 0, 0], rotation}) {
-        let geometry = new THREE.BoxGeometry(20, 20, 20);
-        let material = new THREE.MeshPhongMaterial({color: 0xF7E82ED});
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.position.set(position[0], position[1], position[2]);
-
-
-    }
-}
-
 export default class App {
-    constructor() {
+    constructor(){
 
         // Creates all of canvas and scenery necessary
         this.createCanvas();
 
-        this.spawner = new Spawner({
-            player: this.player,
-            scene: this.scene,
-            objects: [TestObject],
-            intervalFunction: () => {
-                return 1.0
-            }
-        });
-        this.spawner.start();
+        // Create the different lanes
+        this.leftLaneValue = -160;
+        this.centerLaneValue = 0;
+        this.rightLaneValue = 160;
 
-        // Load a glTF resource
-        // Instantiate a loader
-        this.loader = new GLTFLoader();
-        this.loader.load('./app/js/scene.gltf', this.carHandleLoad.bind(this));
+        // Distance to spawn away from the car
+        this.spawnDistance = 1500;
 
-        // Creates the lanes for the objects to go in
-        this.createLanes();
+        // Time to wait to spawn objects in
+        this.waitToSpawn = 200;
+        // Creates the main players car
+        this.car = new Car();
 
+        // Creates the box obstacle
+        this.boxes = [];
+        for (let i = 0; i < 9; i++) {
+            if (i < 3)
+                this.boxes[i] = new Box(this.leftLaneValue);
+            if (i >= 3 && i < 6)
+                this.boxes[i] = new Box(this.centerLaneValue);
+            if (i >= 6)
+                this.boxes[i] = new Box(this.rightLaneValue);
+        }
+
+        // Add the deer to hit
+        this.deer = [];
+        for (let i = 0; i < 4; i++) {
+            if (i < 2)
+                this.deer[i] = new Deer(this.rightLaneValue, "left");
+            else
+                this.deer[i]= new Deer(this.leftLaneValue, "right");
+        }
+
+        // Add the motorcycles
+        this.bikes = [];
+        for (let i = 0; i < 6; i++) {
+            if (i < 2)
+                this.bikes[i] = new Moto(this.leftLaneValue);
+            if (i >=2 && i < 4)
+                this.bikes[i] = new Moto(this.centerLaneValue);
+            if (i >=4)
+                this.bikes[i] = new Moto(this.rightLaneValue);
+        }
+
+        // Add a tire
+        let bigTireSize = 50;
+        this.bigTirePositionX = 80;
+        this.bigTirePositionZ = 225;
+
+        let smallTireSize = 45;
+        this.smallTirePositionX = 70;
+        this.smallTirePositionZ = -45;
+
+        this.tireBackRight = new Tire(bigTireSize, "right");
+        this.tireBackLeft = new Tire(bigTireSize, "left");
+        this.tireFrontRight = new Tire(smallTireSize, "right");
+        this.tireFrontLeft = new Tire(smallTireSize, "left");
+
+        //Add the objects
+        this.addObjectsToScene();
 
         window.addEventListener('resize', () => this.resizeHandler());
         document.addEventListener('keydown', (e) => this.handleInput(e));
@@ -60,18 +89,45 @@ export default class App {
     render() {
         dt = (Date.now() - timeBefore) / 1000; // dt in seconds
         timeBefore = Date.now();
-        this.player.update(dt);
-        this.spawner.update(dt);
-
-        console.log(countTime);
         countTime++;
-        if (countTime > 50) {
-            this.changeCar();
-            this.camera.position.z = car.position.z + 200;
-            this.light.position.z = car.position.z - 100;
-            this.light.target.position.z = car.position.z + 10;
+
+        // stop counting after certain frames
+        if (countTime < 200) {
+            console.log(countTime);
         }
 
+        // wait for the objects to be loaded in
+        if (countTime >= this.waitToSpawn) {
+            if (countTime === this.waitToSpawn) {
+                console.log("spawn some objects please");
+                this.spawnObjects();
+            }
+
+            // Show the car and get it moving
+            this.car.visible = true;
+            this.car.update(dt);
+
+            // Increase the car's speed every x distance
+            // if (this.car.getCarPosition("z") % 500 === 0) {
+            //     this.car.setCarSpeed(this.car.getCarSpeed() * 2);
+            // }
+
+            if (countTime % 2500 === 0) {
+                this.car.setCarSpeed(this.car.getCarSpeed() + 2);
+            }
+
+            // Have the light follow the car
+            this.camera.position.z = this.car.getCarPosition("z") + 400;
+            this.light.position.z = this.car.getCarPosition("z") - 100;
+            this.light.target.position.z = this.car.getCarPosition("z") + 10;
+
+            // Add the tires for the car
+            this.rotateTires();
+
+
+            // Add all of the obstacles at certain intervals of time
+            this.placeObstacles();
+        }
 
         this.renderer.render(this.scene, this.camera);
         //this.controls.update();
@@ -80,76 +136,158 @@ export default class App {
     }
 
     /**
-     * Handles loading the 3D object of the player.
-     * Also sets all of the initial values for the car
-     * @param gltf - the .gltf file of the player we are using
+     * Places all of the obstacles at certain intervals
      */
-    carHandleLoad(gltf) {
-        car = gltf.scene.children[0];
-        car.material = new THREE.MeshLambertMaterial();
-        car.material.castShadow = true;
-        car.material.receiveShadow = false;
-        car.position.z = -10;
-        car.rotateZ(-Math.PI / 2);
-        car.scale.set(20, 20, 20);
-        this.scene.add(car);
-    }
+    placeObstacles() {
 
-    /**
-     * Called every frame and updates the player's state.
-     */
-    changeCar() {
-        car.material.castShadow = true;
-        car.material.receiveShadow = false;
+        // Get all of the boxes rotating
+        for (let i = 0; i < this.boxes.length; i++) {
+            this.boxes[i].update(dt);
+        }
+        // Place the boxes every x amount of frames
+        if (countTime % 100 === 0) {
+            this.placeBoxRandomly(Math.floor(Math.random() * 9));
+        }
 
-        // move the player to its desired position
-        let lanePosition = this.lanes[this.lane];
-        lanePosition.z = car.position.z;
-        car.position.lerp(lanePosition, dt * 10);
+        // don't load in the deer until certain distances
+        if (countTime % 200 === 0) {
+            this.placeDeerRandomly(Math.floor(Math.random() * 4));
+        }
+        for (let i = 0; i < this.deer.length; i++) {
+            this.deer[i].update(dt);
+        }
 
-        // move it "forward" based on some speed
-        car.position.z -= this.speed;
-
-        // if the player is close to the lane center, then let them change lanes again
-        if (car.position.distanceTo(lanePosition) <= 10) {
-            this.changingLanes = false;
+        // Don't load in the bike until certain intervals
+        if (countTime % 400 === 0) {
+            this.placeBikeRandomly(Math.floor(Math.random() * 6))
+        }
+        for (let j = 0; j < this.bikes.length; j++) {
+            this.bikes[j].update(dt);
         }
     }
 
-    createLanes() {
-        position = new THREE.Vector3(0, 40, -100);
-        this.lanes = [
-            new THREE.Vector3(-160, position.y, position.z),
-            new THREE.Vector3(0, position.y, position.z),
-            new THREE.Vector3(160, position.y, position.z),
-        ];
-        this.lane = 1;
-        this.laneChangeSpeed = 5;
-        this.speed = 2;
-        this.changingLanes = false;
+    /**
+     * Handles the randomness of the different boxes
+     * @param index - the box in the array to choose
+     */
+    placeBoxRandomly(index) {
+        this.boxes[index].visible = true;
+        this.boxes[index].setBoxPositionZ(this.car.getCarPosition("z") - this.spawnDistance);
     }
 
     /**
-     * Attempts to set the player's lane to an adjacent one. This does not update
-     * the player's position, but simply sets a new target for the player to
-     * move to. The player's lane can only be changed if they are not already changing
-     * lanes. This is called from main.js handleInput().
-     *
-     * @param {number} direction The direction of the lane change. This should be either
-     * -1 or 1, where -1 moves "left" and 1 moves "right" (negative/positive on the X axis)
+     * Places the deer randomly on the left or the right lane
+     * @param index - the specific deer in the array to choose
      */
-    changeLane(direction = 1) {
-        const RIGHT = 1, LEFT = -1;
-        if (this.changingLanes === false) {
-            if (direction === RIGHT && this.lane < 2) {
-                this.changingLanes = true;
-                this.lane++;
-            }
-            if (direction === LEFT && this.lane > 0) {
-                this.changingLanes = true;
-                this.lane--;
-            }
+    placeDeerRandomly(index) {
+        this.deer[index].visible = true;
+        this.deer[index].setDeerPositionZ(this.car.getCarPosition("z") - this.spawnDistance);
+        this.deer[index].setDeerPositionX(this.deer[index].getDeerInitialLanePosition());
+    }
+
+    /**
+     * Places the motorcycles randomly in each lane
+     * @param index
+     */
+    placeBikeRandomly(index) {
+        this.bikes[index].visible = true;
+        this.bikes[index].setMotoPositionZ(this.car.getCarPosition("z") - this.spawnDistance);
+    }
+
+    /**
+     * Adds objects to the scene and makes them initially invisible
+     */
+    addObjectsToScene() {
+
+        // add the car
+        this.car.visible = false;
+        this.scene.add(this.car);
+
+        // add the motorcycle
+        for (let j = 0; j < this.bikes.length; j++) {
+            this.bikes[j].visible = false;
+            this.scene.add(this.bikes[j]);
         }
+
+        // add the deer
+        for (let k = 0; k < this.deer.length; k++) {
+            this.deer[k].visible = false;
+            this.scene.add(this.deer[k]);
+        }
+
+        // add all of the boxes
+        for (let i = 0; i < this.boxes.length; i++) {
+            this.boxes[i].visible = false;
+            this.scene.add(this.boxes[i]);
+        }
+
+        // add the tires
+        this.tireBackRight.visible = false;
+        this.scene.add(this.tireBackRight);
+
+        this.tireBackLeft.visible = false;
+        this.scene.add(this.tireBackLeft);
+
+        this.tireFrontLeft.visible = false;
+        this.scene.add(this.tireFrontLeft);
+
+        this.tireFrontRight.visible = false;
+        this.scene.add(this.tireFrontRight);
+    }
+
+    /**
+     * Spawns all of the obstacles, but behind the camera.
+     * This is done so that all of the loading happens in the beginning
+     */
+    spawnObjects() {
+
+        let howFarBehindToSpawn = 20;
+        // add the motorcycle
+        for (let j = 0; j < this.bikes.length; j++) {
+            this.bikes[j].visible = true;
+            this.bikes[j].setMotoPositionZ(howFarBehindToSpawn);
+        }
+
+        // add the deer
+        for (let k = 0; k < this.deer.length; k++) {
+            this.deer[k].visible = true;
+            this.deer[k].setDeerPositionZ(howFarBehindToSpawn);
+        }
+
+        // add all of the boxes
+        for (let i = 0; i < this.boxes.length; i++) {
+            this.boxes[i].visible = true;
+            this.boxes[i].setBoxPositionZ(howFarBehindToSpawn);
+        }
+    }
+
+    /**
+     * Rotates the tires and keeps them up to date with the car
+     */
+    rotateTires() {
+        this.tireBackLeft.position.x = this.car.getCarPosition("x") - this.bigTirePositionX;
+        this.tireBackLeft.position.y = this.car.getCarPosition("y");
+        this.tireBackLeft.position.z = this.car.getCarPosition("z") + this.bigTirePositionZ;
+        this.tireBackLeft.visible = true;
+        this.tireBackLeft.update(dt);
+
+        this.tireBackRight.position.x = this.car.getCarPosition("x") + this.bigTirePositionX;
+        this.tireBackRight.position.y = this.car.getCarPosition("y");
+        this.tireBackRight.position.z = this.car.getCarPosition("z") + this.bigTirePositionZ;
+        this.tireBackRight.visible = true;
+        this.tireBackRight.update(dt);
+
+        this.tireFrontLeft.position.x = this.car.getCarPosition("x") - this.smallTirePositionX;
+        this.tireFrontLeft.position.y = this.car.getCarPosition("y");
+        this.tireFrontLeft.position.z = this.car.getCarPosition("z") + this.smallTirePositionZ;
+        this.tireFrontLeft.visible = true;
+        this.tireFrontLeft.update(dt);
+
+        this.tireFrontRight.position.x = this.car.getCarPosition("x") + this.smallTirePositionX;
+        this.tireFrontRight.position.y = this.car.getCarPosition("y");
+        this.tireFrontRight.position.z = this.car.getCarPosition("z") + this.smallTirePositionZ;
+        this.tireFrontRight.visible = true;
+        this.tireFrontRight.update(dt);
     }
 
     createCanvas() {
@@ -160,17 +298,13 @@ export default class App {
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         this.scene = new THREE.Scene();
-        this.scene.fog = new THREE.Fog(0x000000, 750, 1200);
+        this.scene.fog = new THREE.Fog(0x000000, 750, 1800);
 
         this.camera = new THREE.PerspectiveCamera(75, 4 / 3, 0.5, 5000);
 
-        this.camera.position.y = 200;
-        this.camera.position.z = 120;
+        this.camera.position.y = 400;
+        this.camera.position.z = 200;
         this.camera.rotateX(-Math.PI / 6);
-
-        this.player = new Player({});
-        // this.scene.add(this.player.mesh);
-
 
         this.light = this.createLight();
         this.scene.add(this.light);
@@ -206,8 +340,8 @@ export default class App {
         // ambient light
         this.scene.add(new THREE.AmbientLight(0x404040)); // soft white light
 
-        let helper = new THREE.CameraHelper(this.light.shadow.camera);
-        this.scene.add(helper);
+        // let helper = new THREE.CameraHelper(this.light.shadow.camera);
+        // this.scene.add(helper);
     }
 
     createLight() {
@@ -238,11 +372,11 @@ export default class App {
     handleInput(e) {
         switch (e.key) {
             case "d": {
-                this.changeLane(1); // right
+                this.car.changeLane(1); // right
             }
                 break;
             case "a": {
-                this.changeLane(-1); // left
+                this.car.changeLane(-1); // left
             }
                 break;
         }
