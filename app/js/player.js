@@ -1,12 +1,14 @@
-import * as THREE from 'three'
+import * as THREE from 'three';
+
 export default class Player {
     constructor({}) {
-        let geometry = new THREE.DodecahedronGeometry(30);
-		let material = new THREE.MeshPhongMaterial({color: 0x14ae6e});
+        let geometry = new THREE.BoxGeometry(20,20,20);
+        let material = new THREE.MeshPhongMaterial({color:0xAA2222});
         this.mesh = new THREE.Mesh(geometry, material);
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = false;
-        let position = new THREE.Vector3(0, 40, -100);
+        let position = new THREE.Vector3(0, 10, -100);
+        this.direction = new THREE.Vector3(0,0,-1);
         this.lanes = [
             new THREE.Vector3(-160, position.y, position.z),
             new THREE.Vector3(0, position.y, position.z),
@@ -15,8 +17,14 @@ export default class Player {
         this.mesh.position.copy(position);
         this.lane = 1;
         this.laneChangeSpeed = 5;
-        this.speed = 2;
+        this.speed = 100;
         this.changingLanes = false;
+            
+            
+        this.mesh.geometry.computeBoundingBox();
+        this.boundingBox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+        this.boundingBox.setFromObject(this.mesh);
+
     }
 
     /**
@@ -29,10 +37,10 @@ export default class Player {
         // move the player to its desired position
         let lanePosition = this.lanes[this.lane];
         lanePosition.z = this.mesh.position.z;
-        this.mesh.position.lerp(lanePosition, dt * 5);
+        this.mesh.position.lerp(lanePosition, dt * this.laneChangeSpeed);
 
         // move it "forward" based on some speed
-        this.mesh.position.z -= this.speed;
+        this.mesh.position.add(this.direction.clone().multiplyScalar(this.speed*dt));
 
         // if the player is close to the lane center, then let them change lanes again
         if (this.mesh.position.distanceTo(lanePosition) <= 10) {
@@ -61,5 +69,9 @@ export default class Player {
                 this.lane--;
             }
         }
+    }
+
+    onCollisionWithObject(object) {
+        // handle something here, eventually
     }
 }

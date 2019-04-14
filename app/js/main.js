@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import TrackballControls from 'three-trackballcontrols';
 import Player from './player';
 import Spawner from './spawner';
+import RoadGenerator from './roadGenerator';
 
 let timeBefore = Date.now();
 
@@ -12,7 +13,18 @@ class TestObject {
 		let geometry = new THREE.BoxGeometry(20, 20, 20);
 		let material = new THREE.MeshPhongMaterial({color: 0xF7E82ED});
 		this.mesh = new THREE.Mesh(geometry, material);
+		
+		this.mesh.geometry.computeBoundingBox();
+		this.boundingBox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
 		this.mesh.position.set(position[0], position[1], position[2]);
+		this.boundingBox.setFromObject(this.mesh);
+		this.mesh.castShadow = true;
+	}
+
+	onCollisionWithPlayer(player) {
+		let vec3 = new THREE.Vector3();
+		player.boundingBox.getSize(vec3);
+		this.mesh.translateY(vec3.y+0.1);
 	}
 }
 
@@ -25,7 +37,7 @@ export default class App {
 		this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 		this.scene = new THREE.Scene();
-		this.scene.fog = new THREE.Fog( 0x000000, 750, 1200 );
+		//this.scene.fog = new THREE.Fog( 0x000000, 750, 2000 );
 
 		this.camera = new THREE.PerspectiveCamera(75, 4/3, 0.5, 5000);
 
@@ -64,19 +76,21 @@ export default class App {
 		let meshCanvas = new THREE.Mesh( geometry, materialCanvas );
 		meshCanvas.receiveShadow = true;
 		meshCanvas.rotation.x = - Math.PI / 2;
-		meshCanvas.scale.set( 1000, 1000, 1000 );
-		this.scene.add(meshCanvas);
+		meshCanvas.scale.set(1000, 1000, 1);
+		//this.scene.add(meshCanvas);
 
 		// ambient light
 		this.scene.add(new THREE.AmbientLight( 0x404040 )); // soft white light
 
-		let helper = new THREE.CameraHelper( this.light.shadow.camera );
-		this.scene.add( helper );
+		//let helper = new THREE.CameraHelper( this.light.shadow.camera );
+		//this.scene.add( helper );
 
-		this.spawner = new Spawner({player:this.player, scene:this.scene, objects:[TestObject], intervalFunction:()=>{return 1.0}});
+		this.spawner = new Spawner({player:this.player, scene:this.scene, objectTypes:[TestObject], intervalFunction:()=>{return 1.0}});
 		this.spawner.start();
 
 		//this.controls = new TrackballControls(this.camera);
+
+		this.roadGenerator = new RoadGenerator({'player':this.player, 'scene':this.scene});
 
 		window.addEventListener('resize', () => this.resizeHandler());
 		document.addEventListener('keydown', (e) => this.handleInput(e));
@@ -97,11 +111,24 @@ export default class App {
 	render() {
 		let dt = (Date.now() - timeBefore) / 1000; // dt in seconds
 		timeBefore = Date.now();
+
 		this.player.update(dt);
 		this.spawner.update(dt);
+
+		this.player.boundingBox.setFromObject(this.player.mesh);
+		for (let o of this.spawner.objects) {
+			o.boundingBox.setFromObject(o.mesh);
+			if (this.player.boundingBox.intersectsBox(o.boundingBox)) {
+				this.player.onCollisionWithObject(o);
+				o.onCollisionWithPlayer(this.player);
+			}
+
+		}
 		this.camera.position.z = this.player.mesh.position.z + 200;
 		this.light.position.z = this.player.mesh.position.z - 100;
 		this.light.target.position.z = this.light.position.z + 10;
+
+		this.roadGenerator.update(dt);
 
 		this.renderer.render(this.scene, this.camera);
 		//this.controls.update();

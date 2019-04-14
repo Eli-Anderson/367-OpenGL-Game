@@ -1,19 +1,24 @@
 export default class Spawner {
-    constructor({objects, intervalFunction, scene, player}) {
-        this.objects = objects;
+    constructor({objectTypes, intervalFunction, scene, player}) {
+        this.objectTypes = objectTypes;
+        this.objects = [];
         this.time = 0.0;
         this.intervalFunction = intervalFunction;
         this.scene = scene;
         this.player = player;
+
+        this.points = [];
     }
 
     spawnObject() {
-        if (this.objects.length > 0) {
-            let i = Math.floor(Math.random() * this.objects.length);
-            this.scene.add(new this.objects[i]({
-                position:[-100+200*Math.random(),20,this.player.mesh.position.z-500]}).mesh);
+        if (this.objectTypes.length > 0) {
+            let randomIndex = Math.floor(Math.random() * this.objectTypes.length);
+            let obj = new this.objectTypes[randomIndex]({
+                position:[0,10,this.player.mesh.position.z-1000]})
+            this.scene.add(obj.mesh);
+            this.objects.push(obj);
         } else {
-            console.warn("Spawner's object list is empty");
+            console.warn("Spawner's objectType list is empty");
         }
     }
 
@@ -31,6 +36,14 @@ export default class Spawner {
             if (this.time >= this.intervalFunction()) {
                 this.time = 0.0;
                 this.spawnObject();
+            }
+        }
+        for (let o of this.objects.slice()) {
+            if (o.mesh.position.z - 200 > this.player.mesh.position.z) {
+                // object is passed the player, off the screen
+                // so let's remove it from the scene
+                this.scene.remove(o.mesh);
+                this.objects.splice(this.objects.indexOf(o), 1);
             }
         }
     }
