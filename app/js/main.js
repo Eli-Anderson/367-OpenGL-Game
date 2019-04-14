@@ -9,6 +9,7 @@ import Tire from './Tire';
 let countTime = 1;
 let dt;
 let timeBefore = Date.now();
+let pointsLabel;
 
 export default class App {
     constructor(){
@@ -25,7 +26,12 @@ export default class App {
         this.spawnDistance = 1500;
 
         // Time to wait to spawn objects in
-        this.waitToSpawn = 200;
+        this.waitToSpawn = 350;
+
+        // How long to wait until objects disappear
+        this.waitToDisappear = 5;
+
+
         // Creates the main players car
         this.car = new Car();
 
@@ -92,23 +98,30 @@ export default class App {
         countTime++;
 
         // stop counting after certain frames
-        if (countTime < 200) {
+        if (countTime < 500) {
             console.log(countTime);
         }
 
         // wait for the objects to be loaded in
         if (countTime >= this.waitToSpawn) {
-            if (countTime === this.waitToSpawn) {
-                console.log("spawn some objects please");
+
+            // Update the text at the top
+            pointsLabel.innerHTML = "Points: " + Math.floor(countTime / 60);
+            
+            // Spawns all of the objects initially so they don't have to load later
+            if (countTime === this.waitToSpawn)
                 this.spawnObjects();
-            }
+
+            // After all of the objects have been made, make them disappear
+            if (countTime === this.waitToSpawn + this.waitToDisappear)
+                this.changeObstacleVisiblity(false);
 
             // Show the car and get it moving
             this.car.visible = true;
             this.car.update(dt);
 
             // Increase the car's speed every x distance
-            // if (this.car.getCarPosition("z") % 500 === 0) {
+            // if (countTime % 100 === 0) {
             //     this.car.setCarSpeed(this.car.getCarSpeed() * 2);
             // }
 
@@ -124,8 +137,7 @@ export default class App {
             // Add the tires for the car
             this.rotateTires();
 
-
-            // Add all of the obstacles at certain intervals of time
+            // // Add all of the obstacles at certain intervals of time
             this.placeObstacles();
         }
 
@@ -181,7 +193,7 @@ export default class App {
      */
     placeDeerRandomly(index) {
         this.deer[index].visible = true;
-        this.deer[index].setDeerPositionZ(this.car.getCarPosition("z") - this.spawnDistance);
+        this.deer[index].setDeerPositionZ(this.car.getCarPosition("z") - this.spawnDistance + 700);
         this.deer[index].setDeerPositionX(this.deer[index].getDeerInitialLanePosition());
     }
 
@@ -241,7 +253,7 @@ export default class App {
      */
     spawnObjects() {
 
-        let howFarBehindToSpawn = 20;
+        let howFarBehindToSpawn = -1000;
         // add the motorcycle
         for (let j = 0; j < this.bikes.length; j++) {
             this.bikes[j].visible = true;
@@ -258,6 +270,28 @@ export default class App {
         for (let i = 0; i < this.boxes.length; i++) {
             this.boxes[i].visible = true;
             this.boxes[i].setBoxPositionZ(howFarBehindToSpawn);
+        }
+    }
+
+    /**
+     * Changes all of the obstacles visibility to the defined visibility
+     * @param visibility - whether an object can be seen or not
+     */
+    changeObstacleVisiblity(visibility) {
+
+        // add the motorcycle
+        for (let j = 0; j < this.bikes.length; j++) {
+            this.bikes[j].visible = visibility;
+        }
+
+        // add the deer
+        for (let k = 0; k < this.deer.length; k++) {
+            this.deer[k].visible = visibility;
+        }
+
+        // add all of the boxes
+        for (let i = 0; i < this.boxes.length; i++) {
+            this.boxes[i].visible = visibility;
         }
     }
 
@@ -342,6 +376,17 @@ export default class App {
 
         // let helper = new THREE.CameraHelper(this.light.shadow.camera);
         // this.scene.add(helper);
+
+        pointsLabel = document.createElement('div');
+        pointsLabel.style.position = 'absolute';
+        //pointsLabel.style.zIndex = 1;    // if you still don't see the label, try uncommenting this
+        pointsLabel.style.width = 150;
+        pointsLabel.style.height = 20;
+        pointsLabel.style.backgroundColor = "white";
+        pointsLabel.innerHTML = "Points: 0";
+        pointsLabel.style.top = 150;
+        pointsLabel.style.left = 400;
+        document.body.appendChild(pointsLabel);
     }
 
     createLight() {
