@@ -6,16 +6,18 @@ import Moto from './Moto';
 import Tire from './Tire';
 
 // Variables to use throughout main
-let countTime = 1;
-let dt;
 let timeBefore = Date.now();
-let pointsLabel;
+let pointsLabel = document.getElementById("score");
 
 export default class App {
     constructor(){
-
+        this.countTime = 0;
         // Creates all of canvas and scenery necessary
         this.createCanvas();
+        this.score = 0;
+        this.paused = false;
+
+        document.getElementById("close-button").onclick = ()=>{this.reset()};
 
         // Create the different lanes
         this.leftLaneValue = -160;
@@ -80,69 +82,89 @@ export default class App {
         this.tireFrontRight = new Tire(smallTireSize, "right");
         this.tireFrontLeft = new Tire(smallTireSize, "left");
 
+        this.allLoadables = [].concat(this.bikes).concat(this.boxes).concat(this.deer).concat([this.car, this.tireBackRight, this.tireBackLeft, this.tireFrontLeft, this.tireFrontRight])
+
+		this.boxIndex = 0;
+
         //Add the objects
         this.addObjectsToScene();
 
         window.addEventListener('resize', () => this.resizeHandler());
         document.addEventListener('keydown', (e) => this.handleInput(e));
         this.resizeHandler();
-        requestAnimationFrame(() => this.render());
+        
+        // Check every 1000ms to see if all our objects are loaded
+		let loadInterval = setInterval(()=>{
+            for (let loadable of this.allLoadables) {
+                if (loadable.loaded === false) return;
+            }
+            // if we get to this point, all objects are loaded, so let's start the render function
+            clearInterval(loadInterval);
+            this.spawnObjects();
+			requestAnimationFrame(() => this.render());
+        }, 1000)
+        
     }
 
     /**
      * Render function that is called every frame to update the objects
      */
     render() {
-        dt = (Date.now() - timeBefore) / 1000; // dt in seconds
+        let dt = (Date.now() - timeBefore) / 1000; // dt in seconds
         timeBefore = Date.now();
-        countTime++;
-
-        // stop counting after certain frames
-        if (countTime < 500) {
-            console.log(countTime);
-        }
-
-        // wait for the objects to be loaded in
-        if (countTime >= this.waitToSpawn) {
+        if (!this.paused) {
+            this.countTime++;
 
             // Update the text at the top
-            pointsLabel.innerHTML = "Points: " + Math.floor(countTime / 60);
+            this.score = Math.floor(this.countTime / 60);
+            pointsLabel.innerText = "Points: " + this.score;
             
             // Spawns all of the objects initially so they don't have to load later
-            if (countTime === this.waitToSpawn)
-                this.spawnObjects();
+            //if (this.countTime === this.waitToSpawn)
+            //    this.spawnObjects();
 
             // After all of the objects have been made, make them disappear
-            if (countTime === this.waitToSpawn + this.waitToDisappear)
-                this.changeObstacleVisiblity(false);
+            //if (this.countTime === this.waitToSpawn + this.waitToDisappear)
+            //    this.changeObstacleVisiblity(false);
 
             // Show the car and get it moving
-            this.car.visible = true;
+            //this.car.visible = true;
             this.car.update(dt);
 
             // Increase the car's speed every x distance
-            // if (countTime % 100 === 0) {
-            //     this.car.setCarSpeed(this.car.getCarSpeed() * 2);
-            // }
-
-            if (countTime % 2500 === 0) {
+            if (this.countTime % 2500 === 0) {
                 this.car.setCarSpeed(this.car.getCarSpeed() + 2);
             }
 
+            // Get all of the boxes rotating
+            for (let i = 0; i < this.boxes.length; i++) {
+                this.boxes[i].update(dt);
+            }
+
             // Have the light follow the car
-            this.camera.position.z = this.car.getCarPosition("z") + 400;
-            this.light.position.z = this.car.getCarPosition("z") - 100;
-            this.light.target.position.z = this.car.getCarPosition("z") + 10;
+            this.camera.position.z = this.car.car.position.z + 400;
+            this.light.position.z = this.car.car.position.z - 100;
+            this.light.target.position.z = this.car.car.position.z + 10;
 
             // Add the tires for the car
-            this.rotateTires();
+            this.rotateTires(dt);
 
             // // Add all of the obstacles at certain intervals of time
-            this.placeObstacles();
-        }
+            this.placeObstacles(dt);
 
-        this.renderer.render(this.scene, this.camera);
-        //this.controls.update();
+
+            for (let box of this.boxes) {
+                if (this.car.boundingBox.intersectsBox(box.boundingBox)) {
+                    box.visible = true;
+                    this.gameOver();
+                    break;
+                }
+            }
+
+
+
+            this.renderer.render(this.scene, this.camera);
+        }
         // setup the render function to "autoloop"
         requestAnimationFrame(() => this.render());
     }
@@ -150,28 +172,24 @@ export default class App {
     /**
      * Places all of the obstacles at certain intervals
      */
-    placeObstacles() {
-
-        // Get all of the boxes rotating
-        for (let i = 0; i < this.boxes.length; i++) {
-            this.boxes[i].update(dt);
-        }
+    placeObstacles(dt) {
         // Place the boxes every x amount of frames
-        if (countTime % 100 === 0) {
-            this.placeBoxRandomly(Math.floor(Math.random() * 9));
+        if (this.countTime % 200 === 0) {
+			this.placeBoxRandomly(this.boxIndex);
+			this.boxIndex = (this.boxIndex + 1) % 9;
         }
 
         // don't load in the deer until certain distances
-        if (countTime % 200 === 0) {
-            this.placeDeerRandomly(Math.floor(Math.random() * 4));
+        if (this.countTime % 200 === 0) {
+            //this.placeDeerRandomly(Math.floor(Math.random() * 4));
         }
         for (let i = 0; i < this.deer.length; i++) {
             this.deer[i].update(dt);
         }
 
         // Don't load in the bike until certain intervals
-        if (countTime % 400 === 0) {
-            this.placeBikeRandomly(Math.floor(Math.random() * 6))
+        if (this.countTime % 400 === 0) {
+            //this.placeBikeRandomly(Math.floor(Math.random() * 6))
         }
         for (let j = 0; j < this.bikes.length; j++) {
             this.bikes[j].update(dt);
@@ -184,7 +202,7 @@ export default class App {
      */
     placeBoxRandomly(index) {
         this.boxes[index].visible = true;
-        this.boxes[index].setBoxPositionZ(this.car.getCarPosition("z") - this.spawnDistance);
+        this.boxes[index].box.position.z = this.car.car.position.z - (this.spawnDistance + Math.random()*500);
     }
 
     /**
@@ -229,7 +247,7 @@ export default class App {
 
         // add all of the boxes
         for (let i = 0; i < this.boxes.length; i++) {
-            this.boxes[i].visible = false;
+            //this.boxes[i].visible = false;
             this.scene.add(this.boxes[i]);
         }
 
@@ -269,7 +287,7 @@ export default class App {
         // add all of the boxes
         for (let i = 0; i < this.boxes.length; i++) {
             this.boxes[i].visible = true;
-            this.boxes[i].setBoxPositionZ(howFarBehindToSpawn);
+            this.boxes[i].box.position.z = howFarBehindToSpawn;
         }
     }
 
@@ -298,28 +316,28 @@ export default class App {
     /**
      * Rotates the tires and keeps them up to date with the car
      */
-    rotateTires() {
-        this.tireBackLeft.position.x = this.car.getCarPosition("x") - this.bigTirePositionX;
-        this.tireBackLeft.position.y = this.car.getCarPosition("y");
-        this.tireBackLeft.position.z = this.car.getCarPosition("z") + this.bigTirePositionZ;
+    rotateTires(dt) {
+        this.tireBackLeft.position.x = this.car.car.position.x - this.bigTirePositionX;
+        this.tireBackLeft.position.y = this.car.car.position.y;
+        this.tireBackLeft.position.z = this.car.car.position.z + this.bigTirePositionZ;
         this.tireBackLeft.visible = true;
         this.tireBackLeft.update(dt);
 
-        this.tireBackRight.position.x = this.car.getCarPosition("x") + this.bigTirePositionX;
-        this.tireBackRight.position.y = this.car.getCarPosition("y");
-        this.tireBackRight.position.z = this.car.getCarPosition("z") + this.bigTirePositionZ;
+        this.tireBackRight.position.x = this.car.car.position.x + this.bigTirePositionX;
+        this.tireBackRight.position.y = this.car.car.position.y;
+        this.tireBackRight.position.z = this.car.car.position.z + this.bigTirePositionZ;
         this.tireBackRight.visible = true;
         this.tireBackRight.update(dt);
 
-        this.tireFrontLeft.position.x = this.car.getCarPosition("x") - this.smallTirePositionX;
-        this.tireFrontLeft.position.y = this.car.getCarPosition("y");
-        this.tireFrontLeft.position.z = this.car.getCarPosition("z") + this.smallTirePositionZ;
+        this.tireFrontLeft.position.x = this.car.car.position.x - this.smallTirePositionX;
+        this.tireFrontLeft.position.y = this.car.car.position.y;
+        this.tireFrontLeft.position.z = this.car.car.position.z + this.smallTirePositionZ;
         this.tireFrontLeft.visible = true;
         this.tireFrontLeft.update(dt);
 
-        this.tireFrontRight.position.x = this.car.getCarPosition("x") + this.smallTirePositionX;
-        this.tireFrontRight.position.y = this.car.getCarPosition("y");
-        this.tireFrontRight.position.z = this.car.getCarPosition("z") + this.smallTirePositionZ;
+        this.tireFrontRight.position.x = this.car.car.position.x + this.smallTirePositionX;
+        this.tireFrontRight.position.y = this.car.car.position.y;
+        this.tireFrontRight.position.z = this.car.car.position.z + this.smallTirePositionZ;
         this.tireFrontRight.visible = true;
         this.tireFrontRight.update(dt);
     }
@@ -372,21 +390,7 @@ export default class App {
         this.scene.add(meshCanvas);
 
         // ambient light
-        this.scene.add(new THREE.AmbientLight(0x404040)); // soft white light
-
-        // let helper = new THREE.CameraHelper(this.light.shadow.camera);
-        // this.scene.add(helper);
-
-        pointsLabel = document.createElement('div');
-        pointsLabel.style.position = 'absolute';
-        //pointsLabel.style.zIndex = 1;    // if you still don't see the label, try uncommenting this
-        pointsLabel.style.width = 150;
-        pointsLabel.style.height = 20;
-        pointsLabel.style.backgroundColor = "white";
-        pointsLabel.innerHTML = "Points: 0";
-        pointsLabel.style.top = 150;
-        pointsLabel.style.left = 400;
-        document.body.appendChild(pointsLabel);
+        this.scene.add(new THREE.AmbientLight(0xF0F0F0)); // soft white light
     }
 
     createLight() {
@@ -415,15 +419,36 @@ export default class App {
     }
 
     handleInput(e) {
-        switch (e.key) {
-            case "d": {
-                this.car.changeLane(1); // right
+        if (this.paused === false) {
+            switch (e.key) {
+                case "d": {
+                    this.car.changeLane(1); // right
+                }
+                    break;
+                case "a": {
+                    this.car.changeLane(-1); // left
+                }
+                    break;
             }
-                break;
-            case "a": {
-                this.car.changeLane(-1); // left
-            }
-                break;
+        }
+    }
+
+    gameOver() {
+        this.paused = true;
+        document.getElementById("game-over-score").innerText = this.score;
+        document.getElementById("game-over").style.display = "block";
+    }
+
+    reset() {
+        document.getElementById("game-over").style.display = "none";
+        this.paused = false;
+        this.countTime = 0;
+
+        this.car.car.position.set(0,0,0);
+        this.car.changeLane(1);
+
+        for (let box of this.boxes) {
+            box.box.position.set(0,0,500)
         }
     }
 }

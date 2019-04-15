@@ -9,6 +9,7 @@ export default class Tire extends Group {
 
         // Load a glTF resource
         // Instantiate a loader
+        this.loaded = false;
         this.loader = new GLTFLoader();
         this.loader.load('./app/js/3DObjects/tireGLTF/scene.gltf', this.handleLoad.bind(this));
 
@@ -38,6 +39,7 @@ export default class Tire extends Group {
         let scaleFactor = this.size;
         this.tire.scale.set(scaleFactor, scaleFactor, scaleFactor);
         this.add(this.tire);
+        this.loaded = true;
     }
 
     /**

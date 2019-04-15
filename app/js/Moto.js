@@ -9,6 +9,7 @@ export default class Moto extends Group{
 
         // Load a glTF resource
         // Instantiate a loader
+        this.loaded = false;
         this.loader = new GLTFLoader();
         this.loader.load('./app/js/3DObjects/motoGLTF/scene.gltf', this.handleLoad.bind(this));
         this.lane = lane;
@@ -30,6 +31,7 @@ export default class Moto extends Group{
         let scaleFactor = 1;
         this.moto.scale.set(scaleFactor, scaleFactor, scaleFactor);
         this.add(this.moto);
+        this.loaded = true;
     }
 
     /**

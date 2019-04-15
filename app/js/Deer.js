@@ -9,6 +9,7 @@ export default class Deer extends Group{
 
         // Load a glTF resource
         // Instantiate a loader
+        this.loaded = false;
         this.loader = new GLTFLoader();
         this.loader.load('./app/js/3DObjects/deerGLTF/scene.gltf', this.handleLoad.bind(this));
         this.lane = startingLane;
@@ -41,6 +42,7 @@ export default class Deer extends Group{
         let scaleFactor = 25;
         this.deer.scale.set(scaleFactor, scaleFactor, scaleFactor);
         this.add(this.deer);
+        this.loaded = true;
     }
 
     /**

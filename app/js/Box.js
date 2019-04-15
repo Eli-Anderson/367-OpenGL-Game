@@ -9,15 +9,16 @@ export default class Box extends Group{
 
         // Load a glTF resource
         // Instantiate a loader
+        this.loaded = false;
         this.loader = new GLTFLoader();
-        this.loader.load('./app/js/3DObjects/boxGLTF/scene.gltf', this.handleLoad.bind(this));
+        this.loader.load('./app/js/3DObjects/boxGLTF/scene.gltf', (gltf)=>{this.handleLoad(gltf)});
         this.lanePosition = lanePosition;
     }
 
     /**
      * Handles loading the 3D object of the player.
      * Also sets all of the initial values for the motorcycle
-     * @param gltf - the .gltf file of the player we are using
+     * @param gltf - the .gltf file for the model
      */
     handleLoad(gltf) {
         this.box = gltf.scene.children[0];
@@ -29,59 +30,18 @@ export default class Box extends Group{
         this.box.position.x = this.lanePosition;
         let scaleFactor = .75;
         this.box.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+        this.boundingBox = new THREE.Box3().setFromObject(this.box);
+
         this.add(this.box);
+        this.loaded = true;
     }
 
     /**
-     * Called every frame and updates the player's state.
+     * Called every frame and updates the object's state.
      */
     update(dt) {
-        this.box.rotateZ(.01);
+        this.box.rotateZ(0.5*dt);
+        this.boundingBox.setFromObject(this.box);
     }
-
-
-    /**
-     * Returns the current position of the box so the main class can access it
-     * @param direction - the direction of the box the user wants to know
-     */
-    getBoxPosition(direction) {
-        switch (direction) {
-            case "x":{
-                return this.box.position.x;
-            }
-            case "y": {
-                return this.box.position.y;
-            }
-            case "z": {
-                return this.box.position.z;
-            }
-            default : break;
-        }
-    }
-
-    /**
-     * Setter for the x position of the box
-     * @param pos - the value of the position to be at
-     */
-    setBoxPositionX(pos) {
-        this.box.position.x = pos;
-    }
-
-    /**
-     * Setter for the y position of the box
-     * @param pos - the value of the position to be at
-     */
-    setBoxPositionY(pos) {
-        this.box.position.y = pos;
-    }
-
-    /**
-     * Setter for the z position of the box
-     * @param pos - the value of the position to be at
-     */
-    setBoxPositionZ(pos) {
-        this.box.position.z = pos;
-    }
-
-
 }

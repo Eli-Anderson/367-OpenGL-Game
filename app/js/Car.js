@@ -8,6 +8,7 @@ export default class Car extends Group {
 
         // Load a glTF resource
         // Instantiate a loader
+        this.loaded = false;
         this.loader = new GLTFLoader();
         this.loader.load('./app/js/3DObjects/carGLTF/scene.gltf', this.handleLoad.bind(this));
 
@@ -30,15 +31,18 @@ export default class Car extends Group {
         this.car.animations;
         let scaleFactor = 50;
         this.car.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+        this.boundingBox = new THREE.Box3().setFromObject(this.car);
+
         this.add(this.car);
+        this.loaded = true;
     }
 
     /**
      * Called every frame and updates the player's state.
      */
     update(dt) {
-        this.car.material.castShadow = true;
-        this.car.material.receiveShadow = false;
+        this.boundingBox.setFromObject(this.car);
 
         // move the player to its desired position
         let lanePosition = this.lanes[this.lane];
@@ -46,7 +50,7 @@ export default class Car extends Group {
         this.car.position.lerp(lanePosition, dt * this.laneChangeSpeed);
 
         // move it "forward" based on some speed
-        this.car.position.z -= this.speed;
+        this.car.position.z -= this.speed * dt;
 
 
         // if the player is close to the lane center, then let them change lanes again
@@ -86,8 +90,8 @@ export default class Car extends Group {
             new THREE.Vector3(160, this.carPosition.y, this.carPosition.z),
         ];
         this.lane = 1;
-        this.laneChangeSpeed = 50;
-        this.speed = 4;
+        this.laneChangeSpeed = 10;
+        this.speed = 200;
         this.changingLanes = false;
     }
 
