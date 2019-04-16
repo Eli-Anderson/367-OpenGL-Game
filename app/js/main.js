@@ -4,6 +4,7 @@ import Box from './Box';
 import Deer from './Deer';
 import Moto from './Moto';
 import Tire from './Tire';
+import RoadGenerator from './roadGenerator';
 
 // Variables to use throughout main
 let timeBefore = Date.now();
@@ -25,8 +26,8 @@ export default class App {
         this.rightLaneValue = 160;
 
         // Distance to spawn away from the car
-        this.boxSpawnDistance = 1000;
-        this.deerSpawnDistance = 1500;
+        this.boxSpawnDistance = 1300;
+        this.deerSpawnDistance = 1600;
 
         // Time to wait to spawn objects in
         this.waitToSpawn = 350;
@@ -53,15 +54,16 @@ export default class App {
         this.deer = [];
         for (let i = 0; i < 4; i++) {
             if (i < 2)
-                this.deer[i] = new Deer(this.rightLaneValue, "left");
+                this.deer[i] = new Deer(this.rightLaneValue + 100, "left");
             else
-                this.deer[i]= new Deer(this.leftLaneValue, "right");
+                this.deer[i]= new Deer(this.leftLaneValue - 100, "right");
         }
 
         this.allLoadables = [].concat(this.boxes).concat(this.deer).concat([this.car])
 
         this.boxIndex = 0;
         this.deerIndex = 0;
+
 
         //Add the objects
         this.addObjectsToScene();
@@ -85,6 +87,7 @@ export default class App {
             }
             this.spawnObjects();
             this.car.visible = true;
+            this.roadGenerator = new RoadGenerator({scene:this.scene, player: this.car.car});
 			requestAnimationFrame(() => this.render());
         }, 1000)
         
@@ -102,9 +105,10 @@ export default class App {
 
             // Update the text at the top
             this.score = Math.floor(this.countTime / 60);
-            pointsLabel.innerText = "Points: " + this.score;
+            pointsLabel.innerText = this.score;
 
             this.car.update(dt);
+            this.roadGenerator.update(dt);
 
             // Increase the car's speed every x distance
             if (this.countTime % 500 === 0) {
@@ -151,7 +155,7 @@ export default class App {
      */
     placeObstacles(dt) {
         // Place the boxes every x amount of frames
-        if (this.countTime % 200 === 0) {
+        if (this.countTime % 130 === 0) {
 			this.placeBoxRandomly(this.boxIndex);
 			this.boxIndex = (this.boxIndex + 1) % this.boxes.length;
         }
@@ -281,7 +285,7 @@ export default class App {
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         this.scene = new THREE.Scene();
-        this.scene.fog = new THREE.Fog(0x000000, 750, 1800);
+        this.scene.fog = new THREE.FogExp2(0x000000, 0.001);
 
         this.camera = new THREE.PerspectiveCamera(75, 4 / 3, 0.5, 5000);
 
@@ -306,18 +310,18 @@ export default class App {
         context.fillRect(0, 0, 64, 64);
         context.fillRect(64, 64, 64, 64);
 
-        let textureCanvas = new THREE.CanvasTexture(imageCanvas);
-        textureCanvas.repeat.set(1000, 1000);
+        let textureCanvas = new THREE.TextureLoader().load("./app/textures/grass.jpg");
+        textureCanvas.repeat.set(128, 128);
         textureCanvas.wrapS = THREE.RepeatWrapping;
         textureCanvas.wrapT = THREE.RepeatWrapping;
 
 
         let materialCanvas = new THREE.MeshPhongMaterial({map: textureCanvas});
-        let geometry = new THREE.PlaneBufferGeometry(100, 100);
+        let geometry = new THREE.PlaneBufferGeometry(1, 1);
         let meshCanvas = new THREE.Mesh(geometry, materialCanvas);
         meshCanvas.receiveShadow = true;
         meshCanvas.rotation.x = -Math.PI / 2;
-        meshCanvas.scale.set(1000, 1000, 1000);
+        meshCanvas.scale.set(100000, 100000, 100000);
         this.scene.add(meshCanvas);
 
         // ambient light
@@ -376,7 +380,9 @@ export default class App {
         this.countTime = 0;
 
         this.car.car.position.set(0,0,0);
-        this.car.changeLane(1);
+        this.car.lane = 1;
+
+        this.roadGenerator.reset();
 
         for (let box of this.boxes) {
             box.box.position.set(0,0,500)
