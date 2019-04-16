@@ -2,8 +2,6 @@ import * as THREE from 'three';
 import Car from './Car';
 import Box from './Box';
 import Deer from './Deer';
-import Moto from './Moto';
-import Tire from './Tire';
 import RoadGenerator from './roadGenerator';
 
 // Variables to use throughout main
@@ -78,13 +76,25 @@ export default class App {
             }
             // if we get to this point, all objects are loaded, so let's start the render function
             clearInterval(loadInterval);
-            for (let x=0; x < 10; x++) {
+
+            // shuffle boxes
+            for (let x=0; x < 20; x++) {
                 let i = Math.floor(Math.random()*this.boxes.length);
                 let j = Math.floor(Math.random()*this.boxes.length);
                 let tmp = this.boxes[i];
                 this.boxes[i] = this.boxes[j];
                 this.boxes[j] = tmp;
             }
+
+            // shuffle deer
+            for (let x=0; x < 20; x++) {
+                let i = Math.floor(Math.random()*this.deer.length);
+                let j = Math.floor(Math.random()*this.deer.length);
+                let tmp = this.deer[i];
+                this.deer[i] = this.deer[j];
+                this.deer[j] = tmp;
+            }
+
             this.spawnObjects();
             this.car.visible = true;
             this.roadGenerator = new RoadGenerator({scene:this.scene, player: this.car.car});
@@ -156,8 +166,8 @@ export default class App {
     placeObstacles(dt) {
         // Place the boxes every x amount of frames
         if (this.countTime % 100 === 0) {
-            // this.boxIndex = (this.boxIndex + 1) % this.boxes.length;
-			this.placeBoxRandomly(Math.floor(Math.random() * 9));
+			this.placeBoxRandomly(this.boxIndex);
+            this.boxIndex = (this.boxIndex + 1) % this.boxes.length;
         }
 
         // don't load in the deer until certain distances
