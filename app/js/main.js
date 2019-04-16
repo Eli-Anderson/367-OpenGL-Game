@@ -59,7 +59,7 @@ export default class App {
                 this.deer[i]= new Deer(this.leftLaneValue - 100, "right");
         }
 
-        this.allLoadables = [].concat(this.boxes).concat(this.deer).concat([this.car])
+        this.allLoadables = [].concat(this.boxes).concat(this.deer).concat([this.car]);
 
         this.boxIndex = 0;
         this.deerIndex = 0;
@@ -111,8 +111,8 @@ export default class App {
             this.roadGenerator.update(dt);
 
             // Increase the car's speed every x distance
-            if (this.countTime % 500 === 0) {
-                this.car.speed += 20;
+            if (this.countTime % 200 === 0) {
+                this.car.speed += 50;
             }
 
             // Get all of the boxes rotating
@@ -155,13 +155,13 @@ export default class App {
      */
     placeObstacles(dt) {
         // Place the boxes every x amount of frames
-        if (this.countTime % 130 === 0) {
-			this.placeBoxRandomly(this.boxIndex);
-			this.boxIndex = (this.boxIndex + 1) % this.boxes.length;
+        if (this.countTime % 100 === 0) {
+            // this.boxIndex = (this.boxIndex + 1) % this.boxes.length;
+			this.placeBoxRandomly(Math.floor(Math.random() * 9));
         }
 
         // don't load in the deer until certain distances
-        if (this.countTime % 200 === 0) {
+        if (this.countTime % 120 === 0) {
             this.placeDeerRandomly(this.deerIndex);
 			this.deerIndex = (this.deerIndex + 1) % this.deer.length;
         }

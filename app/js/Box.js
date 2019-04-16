@@ -42,7 +42,7 @@ export default class Box extends Group{
      * Called every frame and updates the object's state.
      */
     update(dt) {
-        this.box.rotateZ(0.5*dt);
+        this.box.rotateZ(0.75*dt);
         this.boundingBox.setFromObject(this.box);
         // shrink the bounding box slightly so it is easier to avoid
         this.boundingBox.expandByScalar(-10);
