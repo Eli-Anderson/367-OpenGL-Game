@@ -15,7 +15,7 @@ export default class Car extends Group {
         this.createLanes();
         this.speed = 600;
         this.lane = 1;
-        this.laneChangeSpeed = 10;
+        this.laneChangeSpeed = 25;
         this.changingLanes = false;
         this.boundingBoxScalar = new THREE.Vector3(-170, 0, -150);
     }
