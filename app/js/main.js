@@ -25,7 +25,8 @@ export default class App {
         this.rightLaneValue = 160;
 
         // Distance to spawn away from the car
-        this.spawnDistance = 1500;
+        this.boxSpawnDistance = 1000;
+        this.deerSpawnDistance = 1500;
 
         // Time to wait to spawn objects in
         this.waitToSpawn = 350;
@@ -57,38 +58,13 @@ export default class App {
                 this.deer[i]= new Deer(this.leftLaneValue, "right");
         }
 
-        // Add the motorcycles
-        this.bikes = [];
-        for (let i = 0; i < 6; i++) {
-            if (i < 2)
-                this.bikes[i] = new Moto(this.leftLaneValue);
-            if (i >=2 && i < 4)
-                this.bikes[i] = new Moto(this.centerLaneValue);
-            if (i >=4)
-                this.bikes[i] = new Moto(this.rightLaneValue);
-        }
+        this.allLoadables = [].concat(this.boxes).concat(this.deer).concat([this.car])
 
-        // Add a tire
-        let bigTireSize = 50;
-        this.bigTirePositionX = 80;
-        this.bigTirePositionZ = 225;
-
-        let smallTireSize = 45;
-        this.smallTirePositionX = 70;
-        this.smallTirePositionZ = -45;
-
-        this.tireBackRight = new Tire(bigTireSize, "right");
-        this.tireBackLeft = new Tire(bigTireSize, "left");
-        this.tireFrontRight = new Tire(smallTireSize, "right");
-        this.tireFrontLeft = new Tire(smallTireSize, "left");
-
-        this.allLoadables = [].concat(this.bikes).concat(this.boxes).concat(this.deer).concat([this.car, this.tireBackRight, this.tireBackLeft, this.tireFrontLeft, this.tireFrontRight])
-
-		this.boxIndex = 0;
+        this.boxIndex = 0;
+        this.deerIndex = 0;
 
         //Add the objects
         this.addObjectsToScene();
-
         window.addEventListener('resize', () => this.resizeHandler());
         document.addEventListener('keydown', (e) => this.handleInput(e));
         this.resizeHandler();
@@ -100,7 +76,15 @@ export default class App {
             }
             // if we get to this point, all objects are loaded, so let's start the render function
             clearInterval(loadInterval);
+            for (let x=0; x < 10; x++) {
+                let i = Math.floor(Math.random()*this.boxes.length);
+                let j = Math.floor(Math.random()*this.boxes.length);
+                let tmp = this.boxes[i];
+                this.boxes[i] = this.boxes[j];
+                this.boxes[j] = tmp;
+            }
             this.spawnObjects();
+            this.car.visible = true;
 			requestAnimationFrame(() => this.render());
         }, 1000)
         
@@ -112,33 +96,27 @@ export default class App {
     render() {
         let dt = (Date.now() - timeBefore) / 1000; // dt in seconds
         timeBefore = Date.now();
+        dt = Math.min(dt, 0.3);
         if (!this.paused) {
             this.countTime++;
 
             // Update the text at the top
             this.score = Math.floor(this.countTime / 60);
             pointsLabel.innerText = "Points: " + this.score;
-            
-            // Spawns all of the objects initially so they don't have to load later
-            //if (this.countTime === this.waitToSpawn)
-            //    this.spawnObjects();
 
-            // After all of the objects have been made, make them disappear
-            //if (this.countTime === this.waitToSpawn + this.waitToDisappear)
-            //    this.changeObstacleVisiblity(false);
-
-            // Show the car and get it moving
-            //this.car.visible = true;
             this.car.update(dt);
 
             // Increase the car's speed every x distance
-            if (this.countTime % 2500 === 0) {
-                this.car.setCarSpeed(this.car.getCarSpeed() + 2);
+            if (this.countTime % 500 === 0) {
+                this.car.speed += 20;
             }
 
             // Get all of the boxes rotating
             for (let i = 0; i < this.boxes.length; i++) {
                 this.boxes[i].update(dt);
+            }
+            for (let i = 0; i < this.deer.length; i++) {
+                this.deer[i].update(dt);
             }
 
             // Have the light follow the car
@@ -147,15 +125,14 @@ export default class App {
             this.light.target.position.z = this.car.car.position.z + 10;
 
             // Add the tires for the car
-            this.rotateTires(dt);
+            //this.rotateTires(dt);
 
             // // Add all of the obstacles at certain intervals of time
             this.placeObstacles(dt);
 
-
-            for (let box of this.boxes) {
-                if (this.car.boundingBox.intersectsBox(box.boundingBox)) {
-                    box.visible = true;
+            let obstacles = [].concat(this.boxes).concat(this.deer);
+            for (let obstacle of obstacles) {
+                if (this.car.boundingBox.intersectsBox(obstacle.boundingBox)) {
                     this.gameOver();
                     break;
                 }
@@ -176,23 +153,13 @@ export default class App {
         // Place the boxes every x amount of frames
         if (this.countTime % 200 === 0) {
 			this.placeBoxRandomly(this.boxIndex);
-			this.boxIndex = (this.boxIndex + 1) % 9;
+			this.boxIndex = (this.boxIndex + 1) % this.boxes.length;
         }
 
         // don't load in the deer until certain distances
         if (this.countTime % 200 === 0) {
-            //this.placeDeerRandomly(Math.floor(Math.random() * 4));
-        }
-        for (let i = 0; i < this.deer.length; i++) {
-            this.deer[i].update(dt);
-        }
-
-        // Don't load in the bike until certain intervals
-        if (this.countTime % 400 === 0) {
-            //this.placeBikeRandomly(Math.floor(Math.random() * 6))
-        }
-        for (let j = 0; j < this.bikes.length; j++) {
-            this.bikes[j].update(dt);
+            this.placeDeerRandomly(this.deerIndex);
+			this.deerIndex = (this.deerIndex + 1) % this.deer.length;
         }
     }
 
@@ -202,7 +169,7 @@ export default class App {
      */
     placeBoxRandomly(index) {
         this.boxes[index].visible = true;
-        this.boxes[index].box.position.z = this.car.car.position.z - (this.spawnDistance + Math.random()*500);
+        this.boxes[index].box.position.z = this.car.car.position.z - (this.boxSpawnDistance + Math.random()*500);
     }
 
     /**
@@ -211,8 +178,8 @@ export default class App {
      */
     placeDeerRandomly(index) {
         this.deer[index].visible = true;
-        this.deer[index].setDeerPositionZ(this.car.getCarPosition("z") - this.spawnDistance + 700);
-        this.deer[index].setDeerPositionX(this.deer[index].getDeerInitialLanePosition());
+        this.deer[index].deer.position.z = this.car.car.position.z - (this.deerSpawnDistance + Math.random()*500);
+        this.deer[index].deer.position.x = this.deer[index].getDeerInitialLanePosition();
     }
 
     /**
@@ -234,10 +201,12 @@ export default class App {
         this.scene.add(this.car);
 
         // add the motorcycle
+        /*
         for (let j = 0; j < this.bikes.length; j++) {
             this.bikes[j].visible = false;
             this.scene.add(this.bikes[j]);
         }
+        */
 
         // add the deer
         for (let k = 0; k < this.deer.length; k++) {
@@ -247,22 +216,9 @@ export default class App {
 
         // add all of the boxes
         for (let i = 0; i < this.boxes.length; i++) {
-            //this.boxes[i].visible = false;
+            this.boxes[i].visible = false;
             this.scene.add(this.boxes[i]);
         }
-
-        // add the tires
-        this.tireBackRight.visible = false;
-        this.scene.add(this.tireBackRight);
-
-        this.tireBackLeft.visible = false;
-        this.scene.add(this.tireBackLeft);
-
-        this.tireFrontLeft.visible = false;
-        this.scene.add(this.tireFrontLeft);
-
-        this.tireFrontRight.visible = false;
-        this.scene.add(this.tireFrontRight);
     }
 
     /**
@@ -271,22 +227,24 @@ export default class App {
      */
     spawnObjects() {
 
-        let howFarBehindToSpawn = -1000;
+        let howFarBehindToSpawn = 1000;
         // add the motorcycle
+        /*
         for (let j = 0; j < this.bikes.length; j++) {
             this.bikes[j].visible = true;
             this.bikes[j].setMotoPositionZ(howFarBehindToSpawn);
         }
+        */
 
         // add the deer
         for (let k = 0; k < this.deer.length; k++) {
-            this.deer[k].visible = true;
-            this.deer[k].setDeerPositionZ(howFarBehindToSpawn);
+            //this.deer[k].visible = true;
+            this.deer[k].deer.position.z = howFarBehindToSpawn;
         }
 
         // add all of the boxes
         for (let i = 0; i < this.boxes.length; i++) {
-            this.boxes[i].visible = true;
+            //this.boxes[i].visible = true;
             this.boxes[i].box.position.z = howFarBehindToSpawn;
         }
     }
@@ -298,9 +256,11 @@ export default class App {
     changeObstacleVisiblity(visibility) {
 
         // add the motorcycle
+        /*
         for (let j = 0; j < this.bikes.length; j++) {
             this.bikes[j].visible = visibility;
         }
+        */
 
         // add the deer
         for (let k = 0; k < this.deer.length; k++) {
@@ -309,37 +269,8 @@ export default class App {
 
         // add all of the boxes
         for (let i = 0; i < this.boxes.length; i++) {
-            this.boxes[i].visible = visibility;
+            //this.boxes[i].visible = visibility;
         }
-    }
-
-    /**
-     * Rotates the tires and keeps them up to date with the car
-     */
-    rotateTires(dt) {
-        this.tireBackLeft.position.x = this.car.car.position.x - this.bigTirePositionX;
-        this.tireBackLeft.position.y = this.car.car.position.y;
-        this.tireBackLeft.position.z = this.car.car.position.z + this.bigTirePositionZ;
-        this.tireBackLeft.visible = true;
-        this.tireBackLeft.update(dt);
-
-        this.tireBackRight.position.x = this.car.car.position.x + this.bigTirePositionX;
-        this.tireBackRight.position.y = this.car.car.position.y;
-        this.tireBackRight.position.z = this.car.car.position.z + this.bigTirePositionZ;
-        this.tireBackRight.visible = true;
-        this.tireBackRight.update(dt);
-
-        this.tireFrontLeft.position.x = this.car.car.position.x - this.smallTirePositionX;
-        this.tireFrontLeft.position.y = this.car.car.position.y;
-        this.tireFrontLeft.position.z = this.car.car.position.z + this.smallTirePositionZ;
-        this.tireFrontLeft.visible = true;
-        this.tireFrontLeft.update(dt);
-
-        this.tireFrontRight.position.x = this.car.car.position.x + this.smallTirePositionX;
-        this.tireFrontRight.position.y = this.car.car.position.y;
-        this.tireFrontRight.position.z = this.car.car.position.z + this.smallTirePositionZ;
-        this.tireFrontRight.visible = true;
-        this.tireFrontRight.update(dt);
     }
 
     createCanvas() {

@@ -32,6 +32,7 @@ export default class Box extends Group{
         this.box.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
         this.boundingBox = new THREE.Box3().setFromObject(this.box);
+        //this.add(new THREE.Box3Helper(this.boundingBox, 0xFFFFFF)) // shows the bounding box
 
         this.add(this.box);
         this.loaded = true;
@@ -43,5 +44,7 @@ export default class Box extends Group{
     update(dt) {
         this.box.rotateZ(0.5*dt);
         this.boundingBox.setFromObject(this.box);
+        // shrink the bounding box slightly so it is easier to avoid
+        this.boundingBox.expandByScalar(-10);
     }
 }

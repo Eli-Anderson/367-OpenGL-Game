@@ -2,8 +2,7 @@ import * as THREE from 'three';
 import GLTFLoader from 'three-gltf-loader';
 import {Group} from "three";
 
-
-export default class Deer extends Group{
+export default class Deer extends Group {
     constructor(startingLane, direction) {
         super();
 
@@ -14,8 +13,10 @@ export default class Deer extends Group{
         this.loader.load('./app/js/3DObjects/deerGLTF/scene.gltf', this.handleLoad.bind(this));
         this.lane = startingLane;
         this.direction = direction;
+        this.speed = 200;
+        this.boundingBoxScalar = new THREE.Vector3(-40, 0, 0);
     }
-
+    
     /**
      * Handles loading the 3D object of the player.
      * Also sets all of the initial values for the motorcycle
@@ -26,34 +27,39 @@ export default class Deer extends Group{
         this.deer.material = new THREE.MeshLambertMaterial();
         this.deer.material.castShadow = true;
         this.deer.material.receiveShadow = false;
-
+        
         //move to left to see it initially
         this.deer.position.x = this.lane;
         // this.deer.rotateZ(Math.PI/2);
-
+        
         if (this.direction === "left") {
             this.deer.rotateZ(-Math.PI / 6);
         }
-
+        
         if (this.direction === "right") {
             this.deer.rotateZ(5* Math.PI / 6);
         }
-
+        
         let scaleFactor = 25;
         this.deer.scale.set(scaleFactor, scaleFactor, scaleFactor);
+        this.boundingBox = new THREE.Box3();
         this.add(this.deer);
         this.loaded = true;
+        //this.add(new THREE.Box3Helper(this.boundingBox, 0xFFFFFF)) // shows the bounding box
     }
 
     /**
      * Called every frame and updates the player's state.
      */
     update(dt) {
+        this.boundingBox.setFromObject(this.deer);
+        // shrink the bounding box to fit the deer model
+        this.boundingBox.expandByVector(this.boundingBoxScalar);
         if (this.direction === "left") {
-            this.deer.position.x -= 2;
+            this.deer.position.x -= this.speed * dt;
         }
         if (this.direction === "right") {
-            this.deer.position.x += 2;
+            this.deer.position.x += this.speed * dt;
         }
     }
 

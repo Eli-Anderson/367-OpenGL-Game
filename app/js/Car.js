@@ -5,15 +5,19 @@ import {Group} from "three";
 export default class Car extends Group {
     constructor() {
         super();
-
+        
         // Load a glTF resource
         // Instantiate a loader
         this.loaded = false;
         this.loader = new GLTFLoader();
-        this.loader.load('./app/js/3DObjects/carGLTF/scene.gltf', this.handleLoad.bind(this));
-
+        this.loader.load('./app/js/3DObjects/old_rusty_car/scene.gltf', this.handleLoad.bind(this));
+        
         this.createLanes();
-
+        this.speed = 600;
+        this.lane = 1;
+        this.laneChangeSpeed = 10;
+        this.changingLanes = false;
+        this.boundingBoxScalar = new THREE.Vector3(-170, 0, -150);
     }
 
     /**
@@ -27,15 +31,16 @@ export default class Car extends Group {
         this.car.material.castShadow = true;
         this.car.material.receiveShadow = false;
         this.car.position.z = -10;
-        this.car.rotateZ(-Math.PI/2);
+        this.car.rotateZ(Math.PI);
         this.car.animations;
-        let scaleFactor = 50;
+        let scaleFactor = 0.4;
         this.car.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
         this.boundingBox = new THREE.Box3().setFromObject(this.car);
 
         this.add(this.car);
         this.loaded = true;
+        //this.add(new THREE.Box3Helper(this.boundingBox, 0xFFFFFF)) // shows the bounding box
     }
 
     /**
@@ -43,6 +48,8 @@ export default class Car extends Group {
      */
     update(dt) {
         this.boundingBox.setFromObject(this.car);
+        // shrink the bounding box to fit the car
+        this.boundingBox.expandByVector(this.boundingBoxScalar);
 
         // move the player to its desired position
         let lanePosition = this.lanes[this.lane];
@@ -54,7 +61,7 @@ export default class Car extends Group {
 
 
         // if the player is close to the lane center, then let them change lanes again
-        if (this.car.position.distanceTo(lanePosition) <= 10) {
+        if (this.car.position.distanceTo(lanePosition) <= 20) {
             this.changingLanes = false;
         }
     }
@@ -89,26 +96,6 @@ export default class Car extends Group {
             new THREE.Vector3(0, this.carPosition.y, this.carPosition.z),
             new THREE.Vector3(160, this.carPosition.y, this.carPosition.z),
         ];
-        this.lane = 1;
-        this.laneChangeSpeed = 10;
-        this.speed = 200;
-        this.changingLanes = false;
-    }
-
-    /**
-     * Set the speed of the car
-     * @param speed - how fast the car goes down the road
-     */
-    setCarSpeed(speed) {
-        this.speed = speed;
-    }
-
-    /**
-     * Returns the current speed of the car
-     * @returns speed - how fast the car is going
-     */
-    getCarSpeed() {
-        return this.speed;
     }
 
     /**
